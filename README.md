@@ -59,13 +59,21 @@ npm run preview             # 本地预览生产包
 
 > 首次运行先 `npm install`。数据校验非启动必需，但建议在改动数据后运行，会自动列出孤立人物、重复 id、悬空引用、指向自身等错误。
 
-## 静态部署
+## 部署
 
-项目为纯静态站点（`base: "./"`，相对路径），可部署到任意静态托管：
+线上分享地址（GitHub Pages）：**https://macher251506009.github.io/ouyang-xiu-starmap/**
 
-- **Vercel / Netlify / Cloudflare Pages**：构建命令 `npm run build`，输出目录 `dist`。
-- **GitHub Pages**：`npm run build` 后将 `dist/` 内容推送到 gh-pages 分支。
-- 或直接用任一静态服务器托管 `dist/`：`npx serve dist`。
+发布方式：**GitHub Pages + `gh-pages` 分支**（分支存放构建产物 `index.html` + `assets/`，相对路径；Settings → Pages → branch `gh-pages` → root）。每次更新网页成品，重新 `npm run build` 后将新的 `dist/` 更新到 `gh-pages` 分支并推送，GitHub 自动重新上线。
+
+更新 `gh-pages` 分支（本机 WSL 连 GitHub 443 不稳，多试几次或换网络）：
+```bash
+npm run build
+git worktree add --detach /tmp/ghpage origin/gh-pages
+cp -r dist/. /tmp/ghpage/
+cd /tmp/ghpage && git add -A && git commit -m "update dist" && git push origin HEAD:gh-pages
+cd /mnt/c/Users/75044/ouyang-xiu-starmap && git worktree remove /tmp/ghpage
+```
+亦可部署到 Vercel / Netlify / Cloudflare Pages（构建 `npm run build`，输出 `dist`），或本地 `npx serve dist`。
 
 ## 数据模型
 
