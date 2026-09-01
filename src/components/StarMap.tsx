@@ -163,18 +163,20 @@ export default function StarMap(props: StarMapProps) {
     }
     const w = Math.max(x1 - x0, 1);
     const h = Math.max(y1 - y0, 1);
-    const pad = 80;
+    const padX = 80;
+    const padTop = 60;
+    const padBottom = 80;
     const scale = Math.max(
       0.25,
-      Math.min((size.w - pad) / w, (size.h - pad) / h, 1.6),
+      Math.min((size.w - padX) / w, (size.h - padTop - padBottom) / h, 1.6),
     );
-    // 以欧阳修(原点)为中心，但平移被钳制在“所有节点仍可见”的范围内
-    const loX = pad - x0 * scale;
-    const hiX = size.w - pad - x1 * scale;
-    const loY = pad - y0 * scale;
-    const hiY = size.h - pad - y1 * scale;
+    // 理想中心：水平正中，垂直略偏下(55%)，避开左上控制面板与标题区
+    const loX = padX - x0 * scale;
+    const hiX = size.w - padX - x1 * scale;
+    const loY = padTop - y0 * scale;
+    const hiY = size.h - padBottom - y1 * scale;
     const tx = Math.max(loX, Math.min(size.w / 2, hiX));
-    const ty = Math.max(loY, Math.min(size.h / 2, hiY));
+    const ty = Math.max(loY, Math.min(size.h * 0.55, hiY));
     fitKeyRef.current = fitKey;
     // 直接改写世界 g 的 transform + 同步 zoom 状态（d3-zoom 的手势仍可用）
     worldRef.current.setAttribute("transform", `translate(${tx},${ty}) scale(${scale})`);

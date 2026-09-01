@@ -248,13 +248,56 @@ body {
   stroke-dasharray: 2 4;
 }
 
-/* ── 顶部/左侧控制栏 ── */
-.controls {
+/* ── 顶部/左侧控制栏（可收起） ── */
+.ctrl-drawer {
   position: absolute;
-  top: 96px;
+  top: 84px;
   left: 12px;
   z-index: 25;
   width: min(330px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.drawer-collapse {
+  pointer-events: auto;
+  margin-bottom: 8px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(232, 228, 216, 0.25);
+  background: var(--bg-panel);
+  color: var(--gold);
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.drawer-collapse:hover {
+  background: rgba(47, 127, 143, 0.35);
+  color: #fff;
+}
+.drawer-collapse:focus-visible {
+  outline: 2px solid var(--gold);
+}
+.drawer-open {
+  pointer-events: auto;
+  padding: 7px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(232, 228, 216, 0.3);
+  background: var(--bg-panel);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.drawer-open:hover {
+  background: rgba(47, 127, 143, 0.4);
+  color: #fff;
+}
+.drawer-open:focus-visible {
+  outline: 2px solid var(--gold);
+}
+
+.controls {
   display: flex;
   flex-direction: column;
   gap: 10px;

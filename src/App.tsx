@@ -5,6 +5,7 @@ import type { Relationship, RelationCategory } from "./types";
 import { CATEGORY_LABEL } from "./types";
 import StarMap from "./components/StarMap";
 import ControlPanel from "./components/ControlPanel";
+import ControlDrawer from "./components/ControlDrawer";
 import DetailPanel from "./components/DetailPanel";
 import PathPanel from "./components/PathPanel";
 import InfoModal from "./components/InfoModal";
@@ -175,9 +176,6 @@ export default function App() {
         <h1>欧阳修星图</h1>
         <div className="sub">北宋文人关系宇宙</div>
         <div className="hint">“从一颗星出发，看见一个时代的文学群像。”</div>
-        <div className="hint" style={{ fontSize: 11, opacity: 0.6 }}>
-          选择任意两位人物，探索他们在北宋文坛中的关系路径。
-        </div>
       </div>
 
       <div className="top-bar-actions">
@@ -193,19 +191,22 @@ export default function App() {
         </button>
       </div>
 
-      <ControlPanel
-        selA={selA}
-        selB={selB}
-        activeCategories={activeCategories}
-        centerOnlyTwo={centerOnlyTwo}
-        onSetCenterOnlyTwo={setCenterOnlyTwo}
-        onToggleCategory={toggleCategory}
-        onSwap={swapAB}
-        onReset={resetSel}
-        onFocusPerson={focusPerson}
-        onReturnToCenter={returnToCenter}
-        onSetSlot={setSlot}
-      />
+      {/* 左侧控制面板：可收起（▲ 收起 / ☰ 展开） */}
+      <ControlDrawer>
+        <ControlPanel
+          selA={selA}
+          selB={selB}
+          activeCategories={activeCategories}
+          centerOnlyTwo={centerOnlyTwo}
+          onSetCenterOnlyTwo={setCenterOnlyTwo}
+          onToggleCategory={toggleCategory}
+          onSwap={swapAB}
+          onReset={resetSel}
+          onFocusPerson={focusPerson}
+          onReturnToCenter={returnToCenter}
+          onSetSlot={setSlot}
+        />
+      </ControlDrawer>
 
       <StarMap
         centerId={centerId}
