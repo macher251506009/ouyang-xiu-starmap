@@ -29,10 +29,18 @@ export interface ForceLayoutConfig {
   radiusOf: (id: string) => number;
   reducedMotion: boolean;
   animate: boolean;
+  /** 布局基准中心（通常为视口中心，使坐标=屏幕像素坐标） */
+  originX?: number;
+  originY?: number;
 }
 
-/** 按到欧阳修的距离给节点做同心圆种子位置（中心 id 固定原点） */
-function seedPositions(nodeIds: string[], centerId: string): Map<string, { x: number; y: number }> {
+/** 按到欧阳修的距离给节点做同心圆种子位置（以 origin 为圆心） */
+function seedPositions(
+  nodeIds: string[],
+  centerId: string,
+  ox: number,
+  oy: number,
+): Map<string, { x: number; y: number }> {
   const centers = new Map<string, { x: number; y: number }>();
   for (const id of nodeIds) {
     const d = id === centerId ? 0 : distanceToCenter(id);
@@ -43,8 +51,8 @@ function seedPositions(nodeIds: string[], centerId: string): Map<string, { x: nu
     const dd = d === Infinity ? 9 : Math.round(d);
     const radius = dd === 0 ? 0 : 10 + dd * 70 + (h % 5) * 22;
     centers.set(id, {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
+      x: ox + Math.cos(angle) * radius,
+      y: oy + Math.sin(angle) * radius,
     });
   }
   return centers;
@@ -55,7 +63,7 @@ function seedPositions(nodeIds: string[], centerId: string): Map<string, { x: nu
  * nodeIds/edges/centerId 变化时重建模拟；结果写入 state 供 SVG 渲染。
  */
 export function useForceLayout(cfg: ForceLayoutConfig) {
-  const { centerId, nodeIds, edges, radiusOf, animate } = cfg;
+  const { centerId, nodeIds, edges, radiusOf, animate, originX = 0, originY = 0 } = cfg;
 
   const sig = useMemo(
     () =>
@@ -75,9 +83,9 @@ export function useForceLayout(cfg: ForceLayoutConfig) {
 
   useEffect(() => {
     simRef.current?.stop();
-    const seeds = seedPositions(nodeIds, centerId);
+    const seeds = seedPositions(nodeIds, centerId, originX, originY);
     const nodes: SimNode[] = nodeIds.map((id) => {
-      const s = seeds.get(id) ?? { x: 0, y: 0 };
+      const s = seeds.get(id) ?? { x: originX, y: originY };
       return {
         id,
         x: s.x + (Math.random() - 0.5) * 6,
@@ -106,20 +114,20 @@ export function useForceLayout(cfg: ForceLayoutConfig) {
       )
       .force(
         "x",
-        d3force.forceX<SimNode>((d) => seeds.get(d.id)?.x ?? 0).strength(0.05),
+        d3force.forceX<SimNode>((d) => seeds.get(d.id)?.x ?? originX).strength(0.05),
       )
       .force(
         "y",
-        d3force.forceY<SimNode>((d) => seeds.get(d.id)?.y ?? 0).strength(0.05),
+        d3force.forceY<SimNode>((d) => seeds.get(d.id)?.y ?? originY).strength(0.05),
       )
-      .force("center", d3force.forceCenter<SimNode>(0, 0).strength(0.03))
+      .force("center", d3force.forceCenter<SimNode>(originX, originY).strength(0.03))
       .alphaDecay(0.022)
       .alphaMin(0.01);
 
     const centerNode = nodes.find((n) => n.id === centerId);
     if (centerNode) {
-      centerNode.fx = 0;
-      centerNode.fy = 0;
+      centerNode.fx = originX;
+      centerNode.fy = originY;
     }
 
     sim.on("tick", () => {

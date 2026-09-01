@@ -65,13 +65,22 @@ export default function StarMap(props: StarMapProps) {
   const zoomInstRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const fitKeyRef = useRef<string>("");
 
-  // 容器尺寸
+  // 容器尺寸（用 SVG 自身真实渲染尺寸，移动端 vh 更可靠）
   useEffect(() => {
-    const el = svgRef.current?.parentElement as HTMLElement | null;
-    const update = () => el && setSize({ w: el.clientWidth, h: el.clientHeight });
+    const update = () => {
+      const r = svgRef.current?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        setSize({ w: r.width, h: r.height });
+      }
+    };
     update();
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    // 等一帧，确保 SVG 已按 CSS 铺满
+    const t = window.setTimeout(update, 60);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.clearTimeout(t);
+    };
   }, []);
 
   const nodeIds = useMemo(() => [...visibleIds], [visibleIds]);
@@ -85,8 +94,13 @@ export default function StarMap(props: StarMapProps) {
     radiusOf: (id) => nodeVisual(id, centerId).r,
     reducedMotion,
     animate: !reducedMotion,
+    originX: size.w / 2,
+    originY: size.h / 2,
   });
   const { positions, dragNode } = layout;
+  // 供 doFit 读到最新的布局位置（定时器里闭包用的最新值）
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
 
   // d3-zoom：平移与缩放
   useEffect(() => {
@@ -141,20 +155,20 @@ export default function StarMap(props: StarMapProps) {
   // 自动适配后默认缩放已被拉大到适宜观看，始终显示所有姓名以保障可读性
   const labelAll = true;
 
-  // 自动适配：布局稳定后把整张星图居中并放满画布（直接改写世界 transform，绕开 d3 过渡时机问题）
+  // 自动适配：等力导向布局基本铺开后，把整张星图居中并放满画布。
+  // 用定时触发（而非每个 tick），避免在节点还没铺开时过早固定缩放导致溢出。
   const fitKey = useMemo(
     () => nodeIds.slice().sort().join(",") + "|" + size.w + "x" + size.h + "|" + centerId,
     [nodeIds, size.w, size.h, centerId],
   );
-  // 布局尚未铺开（还有节点没定位）：positions 每 tick 都会更新，无需手动重试
-  useEffect(() => {
+  const fitTimerRef = useRef<number | null>(null);
+  const doFit = useCallback(() => {
+    const pos = positionsRef.current;
     if (!worldRef.current || size.w < 10 || size.h < 10) return;
-    if (fitKeyRef.current === fitKey) return; // 已适配过
-    // 布局尚未铺开（还有节点没定位）：positions 每 tick 都会更新，无需手动重试
-    if (positions.size < nodeIds.length) return;
+    if (pos.size < nodeIds.length) return;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const id of nodeIds) {
-      const p = positions.get(id);
+      const p = pos.get(id);
       if (!p) continue;
       if (p.x < x0) x0 = p.x;
       if (p.x > x1) x1 = p.x;
@@ -167,16 +181,15 @@ export default function StarMap(props: StarMapProps) {
     const padTop = 60;
     const padBottom = 80;
     const scale = Math.max(
-      0.25,
+      0.2,
       Math.min((size.w - padX) / w, (size.h - padTop - padBottom) / h, 1.6),
     );
-    // 理想中心：水平正中，垂直略偏下(55%)，避开左上控制面板与标题区
-    const loX = padX - x0 * scale;
-    const hiX = size.w - padX - x1 * scale;
-    const loY = padTop - y0 * scale;
-    const hiY = size.h - padBottom - y1 * scale;
-    const tx = Math.max(loX, Math.min(size.w / 2, hiX));
-    const ty = Math.max(loY, Math.min(size.h * 0.55, hiY));
+    // 以节点包围盒中心 cx,cy 为基准，把整张星图居中（水平正中），
+    // 垂直方向略偏下(55%)，避开左上控制面板与标题区
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const tx = size.w / 2 - cx * scale;
+    const ty = size.h * 0.55 - cy * scale;
     fitKeyRef.current = fitKey;
     // 直接改写世界 g 的 transform + 同步 zoom 状态（d3-zoom 的手势仍可用）
     worldRef.current.setAttribute("transform", `translate(${tx},${ty}) scale(${scale})`);
@@ -185,7 +198,18 @@ export default function StarMap(props: StarMapProps) {
       select(svgRef.current).call(zoomInstRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions, fitKey]);
+  }, [nodeIds, size.w, size.h, centerId]);
+
+  useEffect(() => {
+    // fitKey 变化（新布局/新尺寸/换中心）时，等布局铺开后再适配一次
+    if (fitTimerRef.current) window.clearTimeout(fitTimerRef.current);
+    if (!worldRef.current || size.w < 10 || size.h < 10) return;
+    fitTimerRef.current = window.setTimeout(doFit, 2000);
+    return () => {
+      if (fitTimerRef.current) window.clearTimeout(fitTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey]);
 
 
   // 容器级还原（点到世界坐标）
@@ -287,6 +311,8 @@ export default function StarMap(props: StarMapProps) {
     <svg
       ref={svgRef}
       className={`starmap ${dragging ? "dragging" : ""}`}
+      width="100%"
+      height="100%"
       role="application"
       aria-label="北宋文人关系星图：欧阳修位于中央，其他人物如星辰般分布四周。"
       onPointerMove={(e) => {
