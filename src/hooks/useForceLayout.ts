@@ -39,7 +39,9 @@ function seedPositions(nodeIds: string[], centerId: string): Map<string, { x: nu
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
     const angle = ((h % 3600) / 3600) * Math.PI * 2;
-    const radius = d === 0 ? 0 : 10 + (d === Infinity ? 220 : d) * 70 + (h % 5) * 22;
+    // 孤立节点(距中心 Infinity)归入最外环，避免被推到上万像素
+    const dd = d === Infinity ? 9 : Math.round(d);
+    const radius = dd === 0 ? 0 : 10 + dd * 70 + (h % 5) * 22;
     centers.set(id, {
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,

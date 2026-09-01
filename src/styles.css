@@ -190,17 +190,19 @@ body {
   opacity: 1;
 }
 .star-node text.label {
-  font-family: var(--font-serif);
-  fill: var(--ink-carbon);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  fill: #f5f1e6;
   paint-order: stroke;
-  stroke: rgba(7, 12, 24, 0.85);
-  stroke-width: 2.5px;
+  stroke: rgba(5, 9, 18, 0.95);
+  stroke-width: 3px;
   stroke-linejoin: round;
+  letter-spacing: 0.05em;
   user-select: none;
   pointer-events: none;
 }
 .star-node text.label.dim-label {
-  fill: rgba(168, 164, 150, 0.85);
+  fill: rgba(220, 216, 205, 0.92);
 }
 
 .edge {

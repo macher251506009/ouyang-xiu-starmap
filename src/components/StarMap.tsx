@@ -31,11 +31,11 @@ interface Transform {
 function nodeVisual(id: string, centerId: string) {
   const isCenter = id === centerId;
   const d = isCenter ? 0 : distanceToCenter(id);
-  if (isCenter) return { r: 13, bright: 1, labelSize: 14, layer: 0 };
-  if (d === 1) return { r: 7, bright: 0.9, labelSize: 12.5, layer: 1 };
-  if (d === 2) return { r: 5.5, bright: 0.72, labelSize: 12, layer: 2 };
-  if (d <= 4) return { r: 4.6, bright: 0.52, labelSize: 11.5, layer: 3 };
-  return { r: 4, bright: 0.34, labelSize: 11, layer: 4 };
+  if (isCenter) return { r: 13, bright: 1, labelSize: 18, layer: 0 };
+  if (d === 1) return { r: 7, bright: 0.9, labelSize: 16, layer: 1 };
+  if (d === 2) return { r: 5.5, bright: 0.72, labelSize: 15, layer: 2 };
+  if (d <= 4) return { r: 4.6, bright: 0.52, labelSize: 14.5, layer: 3 };
+  return { r: 4, bright: 0.34, labelSize: 14, layer: 4 };
 }
 
 export default function StarMap(props: StarMapProps) {
@@ -61,6 +61,9 @@ export default function StarMap(props: StarMapProps) {
   const [dragging, setDragging] = useState(false);
   // 启用拖动的节点 id（触摸/鼠标当前正在拖的）
   const dragState = useRef<{ id: string | null; moved: boolean }>({ id: null, moved: false });
+  // 供自动适配 / 聚焦复位使用的 zoom 实例与“已适配”标记
+  const zoomInstRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const fitKeyRef = useRef<string>("");
 
   // 容器尺寸
   useEffect(() => {
@@ -107,9 +110,12 @@ export default function StarMap(props: StarMapProps) {
         if (world) world.setAttribute("transform", `translate(${t.x},${t.y}) scale(${t.k})`);
       });
     select(svg).call(zoom);
-    select(svg).call(zoom.transform, d3.zoomIdentity.translate(size.w / 2, size.h / 2));
+    zoomInstRef.current = zoom;
+    // 初始以原点为基准（自动适配会在布局稳定后把图居中放满）
+    select(svg).call(zoom.transform, d3.zoomIdentity);
     return () => {
       select(svg).on(".zoom", null);
+      zoomInstRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.w, size.h]);
@@ -132,7 +138,53 @@ export default function StarMap(props: StarMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flashId, focusId]);
 
-  const labelAll = tr.k >= 1.12 || visibleIds.size < 40;
+  // 自动适配后默认缩放已被拉大到适宜观看，始终显示所有姓名以保障可读性
+  const labelAll = true;
+
+  // 自动适配：布局稳定后把整张星图居中并放满画布（直接改写世界 transform，绕开 d3 过渡时机问题）
+  const fitKey = useMemo(
+    () => nodeIds.slice().sort().join(",") + "|" + size.w + "x" + size.h + "|" + centerId,
+    [nodeIds, size.w, size.h, centerId],
+  );
+  // 布局尚未铺开（还有节点没定位）：positions 每 tick 都会更新，无需手动重试
+  useEffect(() => {
+    if (!worldRef.current || size.w < 10 || size.h < 10) return;
+    if (fitKeyRef.current === fitKey) return; // 已适配过
+    // 布局尚未铺开（还有节点没定位）：positions 每 tick 都会更新，无需手动重试
+    if (positions.size < nodeIds.length) return;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const id of nodeIds) {
+      const p = positions.get(id);
+      if (!p) continue;
+      if (p.x < x0) x0 = p.x;
+      if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.y > y1) y1 = p.y;
+    }
+    const w = Math.max(x1 - x0, 1);
+    const h = Math.max(y1 - y0, 1);
+    const pad = 80;
+    const scale = Math.max(
+      0.25,
+      Math.min((size.w - pad) / w, (size.h - pad) / h, 1.6),
+    );
+    // 以欧阳修(原点)为中心，但平移被钳制在“所有节点仍可见”的范围内
+    const loX = pad - x0 * scale;
+    const hiX = size.w - pad - x1 * scale;
+    const loY = pad - y0 * scale;
+    const hiY = size.h - pad - y1 * scale;
+    const tx = Math.max(loX, Math.min(size.w / 2, hiX));
+    const ty = Math.max(loY, Math.min(size.h / 2, hiY));
+    fitKeyRef.current = fitKey;
+    // 直接改写世界 g 的 transform + 同步 zoom 状态（d3-zoom 的手势仍可用）
+    worldRef.current.setAttribute("transform", `translate(${tx},${ty}) scale(${scale})`);
+    setTr({ k: scale, tx, ty });
+    if (zoomInstRef.current && svgRef.current) {
+      select(svgRef.current).call(zoomInstRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions, fitKey]);
+
 
   // 容器级还原（点到世界坐标）
   const toWorld = useCallback(
